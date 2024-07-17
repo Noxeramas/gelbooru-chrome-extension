@@ -50,27 +50,35 @@ function displayImages(images) {
     });
 }
 
-function downloadImageAndTags(imageUrl) {
-    chrome.downloads.download({
-        url: imageUrl,
-        // Optional filename
-        filename: 'download.jpg',
-        conflictAction: 'uniquify'
-    }, function(downloadId) {
-        if (chrome.runtime.lastError) {
-            console.error(chrome.runtime.lastError.message);
-        } else {
-            console.log(`Download started with ID ${downloadId}`);
-        }
+function downloadSelectedImages() {
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+    checkboxes.forEach(checkbox => {
+        const postUrl = checkbox.dataset.postUrl;
+        chrome.tabs.create({ url: postUrl }, (tab) => {
+            chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: fetchHighResImageFromTab
+            }, (results) => {
+                if (results && results[0] && results[0].result) {
+                    const imageUrl = results[0].result;
+                    if (imageUrl) {
+                        console.log('Image URL fetched:', imageUrl);
+                        chrome.runtime.sendMessage({ imageUrl: imageUrl });
+                    } else {
+                        console.error('Failed to fetch high-resolution image');
+                    }
+                } else {
+                    console.error('Failed to execute script on tab');
+                }
+            });
+        });
     });
 }
 
-function downloadSelectedImages() {
-    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-
-    checkboxes.forEach(checkbox => {
-        if (checkbox.checked) {
-            chrome.runtime.sendMessage({ postUrl: checkbox.dataset.postUrl });
-        }
-    });
+function fetchHighResImageFromTab() {
+    console.log('fetchHighResImageFromTab function called');
+    const img = document.querySelector('main div section picture img');
+    const imageUrl = img ? img.src : null;
+    console.log('Image URL:', imageUrl);
+    return imageUrl;
 }

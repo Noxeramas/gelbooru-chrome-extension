@@ -1,55 +1,30 @@
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.postUrl) {
-        fetchImageData(message.postUrl).then(data => {
-            const { imageUrl, tags } = data;
-            downloadImageAndTags(imageUrl, tags);
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' && tab.url && tab.url.includes('https://gelbooru.com/index.php?page=post&s=view&id=')) {
+        console.log('Tab updated:', tab.url);
+        chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            files: ['content.js']
         });
     }
 });
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.imageUrl) {
+        console.log('Message received with imageUrl:', message.imageUrl);
+        downloadImage(message.imageUrl);
+    }
+});
 
-async function fetchImageData(postUrl) {
-    const response = await fetch(postUrl);
-    const text = await response.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(text, 'text/html');
-    const img = doc.querySelector('img');
-    const imageUrl = img.src;
-    const altText = img.alt;
-    const tags = altText.split(', ').join('\n');
-    return { imageUrl, tags };
-}
-
-function downloadImageAndTags(imageUrl, tags) {
+function downloadImage(imageUrl) {
     const filename = imageUrl.split('/').pop();
-    const nameWithoutExt = filename.split('.').slice(0, -1).join('.');
-    const imageFilename = `${nameWithoutExt}.jpg`;
-    const tagsFilename = `${nameWithoutExt}.txt`;
-
-    // Download image
     chrome.downloads.download({
         url: imageUrl,
-        filename: imageFilename,
+        filename: filename,
         conflictAction: 'uniquify'
-    }, function(downloadId) {
+    }, (downloadId) => {
         if (chrome.runtime.lastError) {
-            console.error(chrome.runtime.lastError.message);
+            console.error('Download error:', chrome.runtime.lastError.message);
         } else {
-            console.log(`Image download started with ID ${downloadId}`);
-        }
-    });
-
-    // Download tags
-    const blob = new Blob([tags], { type: 'text/plain' });
-    const tagsUrl = URL.createObjectURL(blob);
-    chrome.downloads.download({
-        url: tagsUrl,
-        filename: tagsFilename,
-        conflictAction: 'uniquify'
-    }, function(downloadId) {
-        if (chrome.runtime.lastError) {
-            console.error(chrome.runtime.lastError.message);
-        } else {
-            console.log(`Tags download started with ID ${downloadId}`);
+            console.log('Download started with ID:', downloadId);
         }
     });
 }
